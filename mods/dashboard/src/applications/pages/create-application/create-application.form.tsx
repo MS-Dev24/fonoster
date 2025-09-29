@@ -5,8 +5,8 @@
  * This file is part of Fonoster
  *
  * Licensed under the MIT License (the "License");
- * you may not use this file except in compliance with
- * the License. You may obtain a copy of the License at
+ * you may not use this file except in compliance with the
+ * License. You may obtain a copy of the License at
  *
  *    https://opensource.org/licenses/MIT
  *
@@ -18,9 +18,10 @@
  */
 
 import { useForm, type Resolver } from "react-hook-form";
-import { forwardRef, useCallback, useEffect, useImperativeHandle } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { Form } from "~/core/components/design-system/forms";
 import { FormRoot } from "~/core/components/design-system/forms/form-root";
+import { useFormContextSync } from "~/core/hooks/use-form-context-sync";
 import {
   APPLICATIONS_DEFAULT_INITIAL_VALUES,
   TTS_DEEPGRAM_VOICES,
@@ -36,21 +37,17 @@ import { SpeechSection } from "./sections/speech-section";
 import { AdvancedSettingsSection } from "./sections/advanced-settings-section";
 import { ConversationSettingsSection } from "./sections/conversation-settings-section";
 
-export interface CreateApplicationFormHandle {
-  submit: () => void;
-  isSubmitDisabled?: boolean;
-}
-
 export interface CreateApplicationFormProps extends React.PropsWithChildren {
   initialValues?: Schema;
   onSubmit: (data: Schema, form: FormType) => Promise<void>;
   isEdit?: boolean;
 }
 
-export const CreateApplicationForm = forwardRef<
-  CreateApplicationFormHandle,
-  CreateApplicationFormProps
->(({ onSubmit, initialValues, isEdit }, ref) => {
+export const CreateApplicationForm = ({
+  onSubmit,
+  initialValues,
+  isEdit
+}: CreateApplicationFormProps) => {
   const form = useForm<Schema>({
     resolver: resolver as Resolver<Schema>,
     defaultValues: { ...APPLICATIONS_DEFAULT_INITIAL_VALUES, ...initialValues },
@@ -61,8 +58,11 @@ export const CreateApplicationForm = forwardRef<
     (data: Schema) => {
       onSubmit(data, form);
     },
-    [onSubmit]
+    [onSubmit, form]
   );
+
+  // Sync form state with context
+  useFormContextSync(form, onFormSubmit, isEdit);
 
   const type = form.watch("type");
   const ttsVendor = form.watch("textToSpeech.productRef");
@@ -72,24 +72,41 @@ export const CreateApplicationForm = forwardRef<
   );
   const isAutopilot = type === "AUTOPILOT";
 
-  useImperativeHandle(ref, () => ({
-    submit: () => form.handleSubmit(onFormSubmit)(),
-    isSubmitDisabled: !form.formState.isValid || form.formState.isSubmitting
-  }));
+  // Use useRef to track previous vendor without causing re-renders
+  const prevTtsVendorRef = useRef<string | undefined>(ttsVendor);
 
   useEffect(() => {
-    if (ttsVendor && ttsVoice) {
-      if (ttsVendor === "tts.deepgram") {
-        const { value: firstVoice } = TTS_DEEPGRAM_VOICES[0];
-        form.setValue("textToSpeech.config.voice", firstVoice);
+    // Only reset voice when vendor actually changes
+    if (ttsVendor && ttsVendor !== prevTtsVendorRef.current) {
+      // Check if current voice is a custom voice (not in predefined lists)
+      const isCustomVoice = (voiceValue: string): boolean => {
+        if (!voiceValue) return false;
+
+        const allPredefinedVoices = [
+          ...TTS_DEEPGRAM_VOICES.map((v) => v.value),
+          ...TTS_ELEVENLABS_VOICES.map((v) => v.value)
+        ];
+
+        return !allPredefinedVoices.includes(voiceValue);
+      };
+
+      // Only reset voice if it's not a custom voice
+      if (!ttsVoice || !isCustomVoice(ttsVoice)) {
+        if (ttsVendor === "tts.deepgram") {
+          const { value: firstVoice } = TTS_DEEPGRAM_VOICES[0];
+          form.setValue("textToSpeech.config.voice", firstVoice);
+        }
+
+        if (ttsVendor === "tts.elevenlabs") {
+          const { value: firstVoice } = TTS_ELEVENLABS_VOICES[0];
+          form.setValue("textToSpeech.config.voice", firstVoice);
+        }
       }
 
-      if (ttsVendor === "tts.elevenlabs") {
-        const { value: firstVoice } = TTS_ELEVENLABS_VOICES[0];
-        form.setValue("textToSpeech.config.voice", firstVoice);
-      }
+      // Update the previous vendor ref
+      prevTtsVendorRef.current = ttsVendor;
     }
-  }, [ttsVendor, ttsVoice]);
+  }, [ttsVendor, ttsVoice, form]);
 
   return (
     <Form {...form}>
@@ -98,6 +115,7 @@ export const CreateApplicationForm = forwardRef<
           control={form.control}
           isAutopilot={isAutopilot}
           isEdit={isEdit}
+          initialValues={initialValues}
         />
         {isAutopilot && (
           <ConversationSettingsSection
@@ -119,4 +137,4 @@ export const CreateApplicationForm = forwardRef<
       </FormRoot>
     </Form>
   );
-});
+};

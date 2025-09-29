@@ -21,16 +21,17 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, type UseFormReturn } from "react-hook-form";
 import { SignupForm } from "./sign-up.form";
-import { useCallback } from "react";
+import { useCallback, useLayoutEffect } from "react";
 import { Box } from "@mui/material";
 import { Typography } from "~/core/components/design-system/ui/typography/typography";
 import { toast } from "~/core/components/design-system/ui/toaster/toaster";
 import type { Route } from "./+types/sign-up.page";
 import { Logger } from "~/core/shared/logger";
 import { useCreateUser } from "~/auth/services/auth.service";
-import { useSubmit } from "react-router";
+import { useNavigate, useSubmit } from "react-router";
 import { getErrorMessage } from "~/core/helpers/extract-error-message";
 import { getGithubSignupUrl } from "~/auth/config/oauth";
+import { IS_CLOUD } from "~/core/sdk/stores/fonoster.config";
 
 export { action } from "../login/login.action";
 
@@ -41,13 +42,7 @@ export function meta(_: Route.MetaArgs) {
 export const schema = z.object({
   name: z.string().nonempty(),
   email: z.string().email(),
-  password: z
-    .string()
-    .min(8, "Password must be at least 8 characters")
-    .regex(
-      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]+$/,
-      "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character (@$!%*?&)"
-    ),
+  password: z.string().min(8, "Password must be at least 8 characters"),
   confirmPassword: z.string(),
   agreeToTerms: z.boolean().refine((val) => val === true, {
     message: "You must agree to the terms and conditions"
@@ -60,6 +55,8 @@ export type Schema = z.infer<typeof schema>;
 export type Form = UseFormReturn<Schema>;
 
 export default function SignupPage() {
+  const navigate = useNavigate();
+
   const form = useForm<Schema>({
     resolver,
     defaultValues: {
@@ -108,6 +105,12 @@ export default function SignupPage() {
 
   const onGithubAuth = useCallback(async () => {
     window.location.href = getGithubSignupUrl();
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!IS_CLOUD) {
+      navigate("/auth/login", { replace: true });
+    }
   }, []);
 
   return (

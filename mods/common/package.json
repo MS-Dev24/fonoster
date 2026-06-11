@@ -19,7 +19,7 @@
   },
   "dependencies": {
     "@fonoster/logger": "^0.15.17",
-    "@grpc/grpc-js": "~1.10.6",
+    "@grpc/grpc-js": "^1.10.12",
     "@grpc/proto-loader": "^0.7.12",
     "@influxdata/influxdb-client": "^1.35.0",
     "dotenv": "^16.4.7",

@@ -26,7 +26,7 @@
     "@fonoster/common": "^0.15.17",
     "@fonoster/identity": "^0.15.17",
     "@fonoster/logger": "^0.15.17",
-    "@grpc/grpc-js": "~1.10.6",
+    "@grpc/grpc-js": "^1.10.12",
     "deepmerge": "^4.3.1",
     "grpc-health-check": "^2.0.2"
   },
